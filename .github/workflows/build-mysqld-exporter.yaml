@@ -1,0 +1,83 @@
+name: mysqld exporter image builder
+
+on:
+  push:
+    branches:
+      - '*'
+  workflow_dispatch:  # This allows manual triggering from the Actions tab if needed
+
+env:
+  imageregistry: 'quay.io'
+  imagenamespace: ${{ secrets.IMAGENAMESPACE || secrets.QUAY_USERNAME }}
+  latesttag: latest
+
+jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secrets are set
+        id: check
+        if: "${{ env.imagenamespace == '' }}"
+        run: |
+          echo "::error title=Missing required secrets::See https://github.com/openstack-k8s-operators/dev-docs/blob/main/image_build.md#creating-images-using-github-actions"
+          echo "missing=true">>$GITHUB_OUTPUT
+    outputs:
+      missing-secrets: ${{ steps.check.outputs.missing }}
+
+  build-image:
+    needs: check-secrets
+    name: Build mysqld_exporter image using buildah
+    runs-on: ubuntu-latest
+    if: needs.check-secrets.outputs.missing-secrets != 'true'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Get branch name
+      id: branch-name
+      uses: tj-actions/branch-names@v7
+
+    - name: Set latest tag for non main branch
+      if: "${{ steps.branch-name.outputs.current_branch != 'main' }}"
+      run: |
+        latesttag=${{ steps.branch-name.outputs.current_branch }}-latest
+        echo "latesttag=${latesttag@L}" >> $GITHUB_ENV
+
+    - name: Buildah Action
+      id: build-image
+      uses: redhat-actions/buildah-build@v2
+      with:
+        image: mysqld_exporter
+        tags: ${{ env.latesttag }} ${{ github.sha }}
+        containerfiles: |
+          ./Containerfile
+
+    - name: Push mysqld_exporter To ${{ env.imageregistry }}
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-image.outputs.image }}
+        tags: ${{ steps.build-image.outputs.tags }}
+        registry: ${{ env.imageregistry }}/${{ env.imagenamespace }}
+        username: ${{ secrets.QUAY_USERNAME }}
+        password: ${{ secrets.QUAY_PASSWORD }}
+        digestfile: digest.txt
+
+    - name: Set IMAGE_DIGEST for tag
+      shell: bash
+      run: |
+        IMAGE_DIGEST=$(cat digest.txt | sed -e 's|sha256:||')
+        echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> $GITHUB_ENV
+        podman tag "localhost/${IMAGE}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE}:${IMAGE_DIGEST}"
+      env:
+        REGISTRY:  ${{ env.imageregistry }}/${{ env.imagenamespace }}
+        IMAGE: mysqld_exporter
+        GITHUB_SHA: ${{ github.sha }}
+
+    - name: Push tag with digest ${{ env.IMAGE_DIGEST }}
+      uses: redhat-actions/push-to-registry@v2
+      with:
+        image: ${{ steps.build-image.outputs.image }}
+        tags: ${{ env.IMAGE_DIGEST }}
+        registry: ${{ env.imageregistry }}/${{ env.imagenamespace }}
+        username: ${{ secrets.QUAY_USERNAME }}
+        password: ${{ secrets.QUAY_PASSWORD }}
