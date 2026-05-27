@@ -12,6 +12,9 @@
 # limitations under the License.
 
 # Needs to be defined before including Makefile.common to auto-generate targets
+
+IMG ?= quay.io/openstack-k8s-operators/mysqld-exporter:latest
+
 DOCKER_ARCHS ?= amd64 armv7 arm64
 
 all: vet
@@ -28,3 +31,11 @@ test-docker-single-exporter:
 	./test_image.sh "$(DOCKER_IMAGE_NAME):$(DOCKER_IMAGE_TAG)" 9104
 
 .PHONY: test-docker
+
+.PHONY: docker-build
+docker-build: ## Build container image
+	podman build -t ${IMG} -f Containerfile .
+
+.PHONY: docker-push
+docker-push: ## Push container image
+	podman push ${IMG}
