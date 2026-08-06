@@ -1,4 +1,6 @@
 name: mysqld exporter image builder
+permissions:
+  contents: read
 
 on:
   push:
@@ -31,7 +33,7 @@ jobs:
     if: needs.check-secrets.outputs.missing-secrets != 'true'
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4.1.3
 
     - name: Set latest tag for non main branch
       if: github.ref_name != 'main'
@@ -43,7 +45,7 @@ jobs:
 
     - name: Buildah Action
       id: build-image
-      uses: redhat-actions/buildah-build@v2
+      uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
       with:
         image: mysqld_exporter
         tags: ${{ env.latesttag }} ${{ github.sha }}
@@ -51,7 +53,7 @@ jobs:
           ./Containerfile
 
     - name: Push mysqld_exporter To ${{ env.imageregistry }}
-      uses: redhat-actions/push-to-registry@v2
+      uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
       with:
         image: ${{ steps.build-image.outputs.image }}
         tags: ${{ steps.build-image.outputs.tags }}
@@ -72,7 +74,7 @@ jobs:
         GITHUB_SHA: ${{ github.sha }}
 
     - name: Push tag with digest ${{ env.IMAGE_DIGEST }}
-      uses: redhat-actions/push-to-registry@v2
+      uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
       with:
         image: ${{ steps.build-image.outputs.image }}
         tags: ${{ env.IMAGE_DIGEST }}
