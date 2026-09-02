@@ -33,51 +33,51 @@ jobs:
     if: needs.check-secrets.outputs.missing-secrets != 'true'
 
     steps:
-    - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4.1.3
+      - uses: actions/checkout@1d96c772d19495a3b5c517cd2bc0cb401ea0529f # v4.1.3
 
-    - name: Set latest tag for non main branch
-      if: github.ref_name != 'main'
-      env:
-        BRANCH_NAME: ${{ github.ref_name }}
-      run: |
-        latesttag=${BRANCH_NAME}-latest
-        echo "latesttag=${latesttag@L}" >> $GITHUB_ENV
+      - name: Set latest tag for non main branch
+        if: github.ref_name != 'main'
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          latesttag=${BRANCH_NAME}-latest
+          echo "latesttag=${latesttag@L}" >> $GITHUB_ENV
 
-    - name: Buildah Action
-      id: build-image
-      uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
-      with:
-        image: mysqld_exporter
-        tags: ${{ env.latesttag }} ${{ github.sha }}
-        containerfiles: |
-          ./Containerfile
+      - name: Buildah Action
+        id: build-image
+        uses: redhat-actions/buildah-build@7a95fa7ee0f02d552a32753e7414641a04307056 # v2
+        with:
+          image: mysqld_exporter
+          tags: ${{ env.latesttag }} ${{ github.sha }}
+          containerfiles: |
+            ./Containerfile
 
-    - name: Push mysqld_exporter To ${{ env.imageregistry }}
-      uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
-      with:
-        image: ${{ steps.build-image.outputs.image }}
-        tags: ${{ steps.build-image.outputs.tags }}
-        registry: ${{ env.imageregistry }}/${{ env.imagenamespace }}
-        username: ${{ secrets.QUAY_USERNAME }}
-        password: ${{ secrets.QUAY_PASSWORD }}
-        digestfile: digest.txt
+      - name: Push mysqld_exporter To ${{ env.imageregistry }}
+        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ steps.build-image.outputs.tags }}
+          registry: ${{ env.imageregistry }}/${{ env.imagenamespace }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+          digestfile: digest.txt
 
-    - name: Set IMAGE_DIGEST for tag
-      shell: bash
-      run: |
-        IMAGE_DIGEST=$(cat digest.txt | sed -e 's|sha256:||')
-        echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> $GITHUB_ENV
-        podman tag "localhost/${IMAGE}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE}:${IMAGE_DIGEST}"
-      env:
-        REGISTRY:  ${{ env.imageregistry }}/${{ env.imagenamespace }}
-        IMAGE: mysqld_exporter
-        GITHUB_SHA: ${{ github.sha }}
+      - name: Set IMAGE_DIGEST for tag
+        shell: bash
+        run: |
+          IMAGE_DIGEST=$(cat digest.txt | sed -e 's|sha256:||')
+          echo "IMAGE_DIGEST=$IMAGE_DIGEST" >> $GITHUB_ENV
+          podman tag "localhost/${IMAGE}:${GITHUB_SHA}" "${REGISTRY}/${IMAGE}:${IMAGE_DIGEST}"
+        env:
+          REGISTRY: ${{ env.imageregistry }}/${{ env.imagenamespace }}
+          IMAGE: mysqld_exporter
+          GITHUB_SHA: ${{ github.sha }}
 
-    - name: Push tag with digest ${{ env.IMAGE_DIGEST }}
-      uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
-      with:
-        image: ${{ steps.build-image.outputs.image }}
-        tags: ${{ env.IMAGE_DIGEST }}
-        registry: ${{ env.imageregistry }}/${{ env.imagenamespace }}
-        username: ${{ secrets.QUAY_USERNAME }}
-        password: ${{ secrets.QUAY_PASSWORD }}
+      - name: Push tag with digest ${{ env.IMAGE_DIGEST }}
+        uses: redhat-actions/push-to-registry@5ed88d269cf581ea9ef6dd6806d01562096bee9c # v2
+        with:
+          image: ${{ steps.build-image.outputs.image }}
+          tags: ${{ env.IMAGE_DIGEST }}
+          registry: ${{ env.imageregistry }}/${{ env.imagenamespace }}
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_PASSWORD }}
